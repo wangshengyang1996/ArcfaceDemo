@@ -2,6 +2,7 @@
 基于虹软android ArcfaceDemo(arcface 2.0）的扩展
 
 相比于官网发布的arcface2.0 android demo:
+
 FIX BUG:
 
 1.修复在部分设备上画框偏移的问题
