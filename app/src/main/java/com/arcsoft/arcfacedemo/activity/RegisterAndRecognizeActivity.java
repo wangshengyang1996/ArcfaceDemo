@@ -405,8 +405,9 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
             }
         };
         cameraHelper = new CameraHelper.Builder()
-                .previewViewSize(new Point(metrics.widthPixels, metrics.heightPixels))
+                .previewViewSize(new Point(previewView.getMeasuredWidth(), previewView.getMeasuredHeight()))
                 .rotation(getWindowManager().getDefaultDisplay().getRotation())
+                .additionalRotation(0)
                 .specificCameraId(cameraID != null ? cameraID : Camera.CameraInfo.CAMERA_FACING_FRONT)
                 .isMirror(false)
                 .previewOn(previewView)

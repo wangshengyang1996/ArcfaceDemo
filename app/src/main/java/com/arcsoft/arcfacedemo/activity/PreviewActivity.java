@@ -216,7 +216,7 @@ public class PreviewActivity extends AppCompatActivity implements ViewTreeObserv
             }
         };
         cameraHelper = new CameraHelper.Builder()
-                .previewViewSize(new Point(metrics.widthPixels,metrics.heightPixels))
+                .previewViewSize(new Point(previewView.getMeasuredWidth(), previewView.getMeasuredHeight()))
                 .rotation(getWindowManager().getDefaultDisplay().getRotation())
                 .specificCameraId(cameraID != null ? cameraID : Camera.CameraInfo.CAMERA_FACING_FRONT)
                 .isMirror(false)
