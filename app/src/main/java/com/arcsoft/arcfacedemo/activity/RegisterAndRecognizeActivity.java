@@ -26,6 +26,7 @@ import android.widget.Switch;
 import android.widget.Toast;
 
 import com.arcsoft.arcfacedemo.model.FacePreviewInfo;
+import com.arcsoft.arcfacedemo.widget.CustomTextureView;
 import com.arcsoft.arcfacedemo.widget.ShowFaceInfoAdapter;
 import com.arcsoft.arcfacedemo.faceserver.CompareResult;
 import com.arcsoft.arcfacedemo.faceserver.FaceServer;
@@ -605,6 +606,17 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
     public void switchCamera(View view) {
         if (cameraHelper != null) {
             cameraHelper.switchCamera();
+        }
+    }
+
+    public void switchRoundPreview(View view) {
+        if (previewView instanceof CustomTextureView) {
+            int radius = ((CustomTextureView) previewView).getRadius();
+            int newRadius = radius == 0 ? Math.min(faceRectView.getMeasuredWidth() / 2, faceRectView.getMeasuredHeight() / 2) : 0;
+            ((CustomTextureView) previewView).setRadius(newRadius);
+            faceRectView.setRadius(newRadius);
+            ((CustomTextureView) previewView).turnRound();
+            faceRectView.turnRound();
         }
     }
 }
