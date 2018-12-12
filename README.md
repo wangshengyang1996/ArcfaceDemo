@@ -14,5 +14,5 @@
 3.CameraHelper可根据传入的控件宽高获取最佳相机比例（如果没有相同比例的，就选最接近的）
 
 **效果展示：**
- ![image](https://github.com/wangshengyang1996/ArcfaceDemo/zxy1.jpg)
- ![image](https://github.com/wangshengyang1996/ArcfaceDemo/zxy2.jpg)
+ ![image](https://github.com/wangshengyang1996/ArcfaceDemo/blob/master/zxy1.jpg)
+ ![image](https://github.com/wangshengyang1996/ArcfaceDemo/blob/master/zxy2.jpg)
