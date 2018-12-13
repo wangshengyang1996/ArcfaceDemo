@@ -5,6 +5,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.hardware.Camera;
+import android.util.Log;
 
 import com.arcsoft.arcfacedemo.model.DrawInfo;
 import com.arcsoft.arcfacedemo.widget.FaceRectView;
@@ -61,6 +62,8 @@ public class DrawHelper {
     }
 
     /**
+     * 调整人脸框用来绘制
+     *
      * @param ftRect FT人脸框
      * @return 调整后的需要被绘制到View上的rect
      */
@@ -79,6 +82,7 @@ public class DrawHelper {
         if (ftRect == null) {
             return null;
         }
+
         Rect rect = new Rect(ftRect);
         float horizontalRatio;
         float verticalRatio;
@@ -93,6 +97,7 @@ public class DrawHelper {
         rect.right *= horizontalRatio;
         rect.top *= verticalRatio;
         rect.bottom *= verticalRatio;
+
         Rect newRect = new Rect();
         switch (cameraDisplayOrientation) {
             case 0:
