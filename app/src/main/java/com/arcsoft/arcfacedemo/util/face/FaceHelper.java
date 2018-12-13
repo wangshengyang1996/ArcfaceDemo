@@ -2,6 +2,7 @@ package com.arcsoft.arcfacedemo.util.face;
 
 import android.graphics.Rect;
 import android.hardware.Camera;
+import android.support.annotation.NonNull;
 import android.util.Log;
 
 import com.arcsoft.arcfacedemo.model.FacePreviewInfo;
@@ -19,6 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class FaceHelper {
     private static final String TAG = "FaceHelper";
@@ -26,17 +30,11 @@ public class FaceHelper {
 
     private Camera.Size previewSize;
 
-    /**
-     * fr 线程数，建议和ft初始化时的maxFaceNum相同
-     */
-    private int frThreadNum = 5;
-
     private List<FaceInfo> faceInfoList = new ArrayList<>();
     private List<LivenessInfo> livenessInfoList = new ArrayList<>();
-    private ExecutorService executor = Executors.newSingleThreadExecutor();
-    private boolean frThreadRunning = false;
+    private ExecutorService executor;
+    private LinkedBlockingQueue<Runnable> frThreadQueue = null;
     private FaceListener faceListener;
-    private LinkedBlockingQueue<FaceRecognizeRunnable> faceRecognizeRunnables;
     //trackId相关
     private int currentTrackId = 0;
     private List<Integer> formerTrackIdList = new ArrayList<>();
@@ -51,19 +49,24 @@ public class FaceHelper {
         faceListener = builder.faceListener;
         currentTrackId = builder.currentTrackId;
         previewSize = builder.previewSize;
+        /*
+      fr 线程数，建议和ft初始化时的maxFaceNum相同
+     */
+        int frThreadNum = 5;
         if (builder.frThreadNum > 0) {
             frThreadNum = builder.frThreadNum;
-            faceRecognizeRunnables = new LinkedBlockingQueue<FaceRecognizeRunnable>(frThreadNum);
         } else {
             Log.e(TAG, "frThread num must > 0,now using default value:" + frThreadNum);
         }
+        frThreadQueue = new LinkedBlockingQueue<Runnable>(frThreadNum);
+        executor = new ThreadPoolExecutor(1, frThreadNum, 0, TimeUnit.MILLISECONDS, frThreadQueue);
         if (previewSize == null) {
             throw new RuntimeException("previewSize must be specified!");
         }
     }
 
     /**
-     * 请求获取人脸特征数据，需要传入FR的参数，以下参数同 AFR_FSDKEngine.AFR_FSDK_ExtractFRFeature
+     * 请求获取人脸特征数据，需要传入FR的参数，以下参数同
      *
      * @param nv21     NV21格式的图像数据
      * @param faceInfo 人脸信息
@@ -74,9 +77,8 @@ public class FaceHelper {
      */
     public void requestFaceFeature(byte[] nv21, FaceInfo faceInfo, int width, int height, int format, Integer trackId) {
         if (faceListener != null) {
-            if (faceEngine != null && faceRecognizeRunnables != null && faceRecognizeRunnables.size() < frThreadNum && !frThreadRunning) {
-                faceRecognizeRunnables.add(new FaceRecognizeRunnable(nv21, faceInfo, width, height, format, trackId));
-                executor.execute(faceRecognizeRunnables.poll());
+            if (faceEngine != null && frThreadQueue.remainingCapacity() > 0) {
+                executor.execute(new FaceRecognizeRunnable(nv21, faceInfo, width, height, format, trackId));
             } else {
                 faceListener.onFaceFeatureInfoGet(null, trackId);
             }
@@ -86,18 +88,17 @@ public class FaceHelper {
 
     public void release() {
         if (!executor.isShutdown()) {
-            executor.shutdown();
+            executor.shutdownNow();
+            frThreadQueue.clear();
         }
         if (faceInfoList != null) {
             faceInfoList.clear();
         }
-        if (faceRecognizeRunnables != null) {
-            faceRecognizeRunnables.clear();
-        }
+
         if (nameMap != null) {
             nameMap.clear();
         }
-        faceRecognizeRunnables = null;
+
         nameMap = null;
         faceListener = null;
         faceInfoList = null;
@@ -118,7 +119,7 @@ public class FaceHelper {
                  * 活体检测只支持一个人脸，所以只保留最大的人脸
                  * 若需要多人脸搜索，删除此行代码，并且关闭活体判断
                  */
-                TrackUtil.keepMaxFace(faceInfoList);
+//                TrackUtil.keepMaxFace(faceInfoList);
 
                 refreshTrackId(faceInfoList);
                 code = faceEngine.process(nv21, previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, faceInfoList, FaceEngine.ASF_LIVENESS);
@@ -168,7 +169,6 @@ public class FaceHelper {
 
         @Override
         public void run() {
-            frThreadRunning = true;
             if (faceListener != null && nv21Data != null) {
                 if (faceEngine != null) {
                     FaceFeature faceFeature = new FaceFeature();
@@ -188,12 +188,8 @@ public class FaceHelper {
                     faceListener.onFaceFeatureInfoGet(null, trackId);
                     faceListener.onFail(new Exception("fr failed ,frEngine is null"));
                 }
-                if (faceRecognizeRunnables != null && faceRecognizeRunnables.size() > 0) {
-                    executor.execute(faceRecognizeRunnables.poll());
-                }
             }
             nv21Data = null;
-            frThreadRunning = false;
         }
     }
 

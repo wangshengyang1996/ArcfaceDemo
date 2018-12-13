@@ -74,16 +74,7 @@ public class PreviewActivity extends AppCompatActivity implements ViewTreeObserv
         }
 
         // Activity启动后就锁定为启动时的方向
-        switch (getResources().getConfiguration().orientation) {
-            case Configuration.ORIENTATION_PORTRAIT:
-                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                break;
-            case Configuration.ORIENTATION_LANDSCAPE:
-                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-                break;
-            default:
-                break;
-        }
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
 
 
 

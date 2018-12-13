@@ -15,6 +15,8 @@ import android.view.View;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -221,6 +223,21 @@ public class CameraHelper implements Camera.PreviewCallback {
         if (sizes == null || sizes.size() == 0) {
             return mCamera.getParameters().getPreviewSize();
         }
+        Camera.Size[] tempSizes = sizes.toArray(new Camera.Size[0]);
+        Arrays.sort(tempSizes, new Comparator<Camera.Size>() {
+            @Override
+            public int compare(Camera.Size o1, Camera.Size o2) {
+                if (o1.width > o2.width) {
+                    return -1;
+                } else if (o1.width == o2.width) {
+                    return o1.height > o2.height ? -1 : 1;
+                } else {
+                    return 1;
+                }
+            }
+        });
+        sizes = Arrays.asList(tempSizes);
+
         Camera.Size bestSize = sizes.get(0);
         float previewViewRatio;
         if (previewViewSize != null) {
