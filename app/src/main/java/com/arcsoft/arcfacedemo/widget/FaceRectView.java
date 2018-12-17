@@ -58,8 +58,7 @@ public class FaceRectView extends View {
         setOutlineProvider(new ViewOutlineProvider() {
             @Override
             public void getOutline(View view, Outline outline) {
-                Rect rect = new Rect();
-                view.getGlobalVisibleRect(rect);
+                Rect rect = new Rect(0,0, view.getMeasuredWidth() , view.getMeasuredHeight());
                 outline.setRoundRect(rect, radius);
             }
         });
