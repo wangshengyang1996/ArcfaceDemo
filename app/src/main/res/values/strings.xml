@@ -40,4 +40,6 @@
     <string name="mirror_horizontal">mirror horizontal</string>
     <string name="switch_camera">switch camera</string>
     <string name="switch_round_preview">switch round preview</string>
+    <string name="app_id">3jV31oGD5YcGBiM4PrCmV83Npi1PGkfqDdDbTWGRq467</string>
+    <string name="sdk_key">75TtTAYdbBBjWnWQgm6co1wnUCHeyhEXECc9E8trM9Xc</string>
 </resources>

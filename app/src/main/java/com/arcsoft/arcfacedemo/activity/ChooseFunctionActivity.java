@@ -161,7 +161,7 @@ public class ChooseFunctionActivity extends AppCompatActivity {
             @Override
             public void subscribe(ObservableEmitter<Integer> emitter) throws Exception {
                 FaceEngine faceEngine = new FaceEngine();
-                int activeCode = faceEngine.active(ChooseFunctionActivity.this, Constants.APP_ID, Constants.SDK_KEY);
+                int activeCode = faceEngine.active(ChooseFunctionActivity.this,getString(R.string.app_id),getString(R.string.sdk_key));
                 emitter.onNext(activeCode);
             }
         })

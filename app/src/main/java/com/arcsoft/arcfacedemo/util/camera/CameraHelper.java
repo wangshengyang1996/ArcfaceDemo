@@ -327,6 +327,8 @@ public class CameraHelper implements Camera.PreviewCallback {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+            }else {
+                start();
             }
 
         }
@@ -358,6 +360,8 @@ public class CameraHelper implements Camera.PreviewCallback {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+            }else {
+                start();
             }
         }
 

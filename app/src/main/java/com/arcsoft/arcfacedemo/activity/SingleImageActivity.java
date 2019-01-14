@@ -429,7 +429,7 @@ public class SingleImageActivity extends AppCompatActivity {
                 } else {
 //                    Log.i(TAG, "processImage: fr costTime = " + (System.currentTimeMillis() - frStartTime));
                     addNotificationInfo(notificationSpannableStringBuilder, null, "faceFeature of face[", String.valueOf(i), "]",
-                            " extract success\n");
+                            " extract success, costTime = ", String.valueOf((System.currentTimeMillis() - frStartTime)), "ms\n");
                 }
             }
             addNotificationInfo(notificationSpannableStringBuilder, null, "\n");
