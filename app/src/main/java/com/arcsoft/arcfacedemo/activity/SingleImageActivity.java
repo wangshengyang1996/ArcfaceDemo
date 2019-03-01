@@ -230,7 +230,7 @@ public class SingleImageActivity extends AppCompatActivity {
             return;
         }
         if (faceEngine == null) {
-            addNotificationInfo(notificationSpannableStringBuilder, null, " faceEngine is null!");
+            addNotificationInfo(notificationSpannableStringBuilder, null, " ftEngine is null!");
             showNotificationAndFinish(notificationSpannableStringBuilder);
             return;
         }

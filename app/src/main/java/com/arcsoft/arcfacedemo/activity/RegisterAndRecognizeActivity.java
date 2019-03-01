@@ -3,7 +3,6 @@ package com.arcsoft.arcfacedemo.activity;
 import android.Manifest;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
 import android.graphics.Point;
 import android.hardware.Camera;
 import android.os.Build;
@@ -18,7 +17,6 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.Surface;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
@@ -27,6 +25,7 @@ import android.widget.Switch;
 import android.widget.Toast;
 
 import com.arcsoft.arcfacedemo.model.FacePreviewInfo;
+import com.arcsoft.arcfacedemo.util.face.RequestLivenessStatus;
 import com.arcsoft.arcfacedemo.widget.CustomTextureView;
 import com.arcsoft.arcfacedemo.widget.ShowFaceInfoAdapter;
 import com.arcsoft.arcfacedemo.faceserver.CompareResult;
@@ -79,7 +78,9 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
      * 优先打开的摄像头
      */
     private Integer cameraID = Camera.CameraInfo.CAMERA_FACING_FRONT;
-    private FaceEngine faceEngine;
+    private FaceEngine ftEngine;
+    private FaceEngine frEngine;
+    private FaceEngine flEngine;
     private FaceHelper faceHelper;
     private List<CompareResult> compareResultList;
     private ShowFaceInfoAdapter adapter;
@@ -106,6 +107,8 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
     private int afCode = -1;
     private ConcurrentHashMap<Integer, Integer> requestFeatureStatusMap = new ConcurrentHashMap<>();
     private ConcurrentHashMap<Integer, Integer> livenessMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, Integer> livenessRetryCountMap = new ConcurrentHashMap<>();
+    private static final int LIVENESS_RETRY_COUNT = 3;
     private CompositeDisposable getFeatureDelayedDisposables = new CompositeDisposable();
     /**
      * 相机预览显示的控件，可为SurfaceView或TextureView
@@ -172,27 +175,45 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
      * 初始化引擎
      */
     private void initEngine() {
-        faceEngine = new FaceEngine();
-        afCode = faceEngine.init(this, FaceEngine.ASF_DETECT_MODE_VIDEO, ConfigUtil.getFtOrient(this),
-                16, MAX_DETECT_NUM, FaceEngine.ASF_FACE_RECOGNITION | FaceEngine.ASF_FACE_DETECT | FaceEngine.ASF_LIVENESS);
-        VersionInfo versionInfo = new VersionInfo();
-        faceEngine.getVersion(versionInfo);
-        Log.i(TAG, "initEngine:  init: " + afCode + "  version:" + versionInfo);
-
+        ftEngine = new FaceEngine();
+        afCode = ftEngine.init(this, FaceEngine.ASF_DETECT_MODE_VIDEO, ConfigUtil.getFtOrient(this),
+                16, MAX_DETECT_NUM,  FaceEngine.ASF_FACE_DETECT);
         if (afCode != ErrorInfo.MOK) {
             Toast.makeText(this, getString(R.string.init_failed, afCode), Toast.LENGTH_SHORT).show();
         }
+
+        frEngine = new FaceEngine();
+        afCode = frEngine.init(this, FaceEngine.ASF_DETECT_MODE_IMAGE, ConfigUtil.getFtOrient(this),
+                16, 1,  FaceEngine.ASF_FACE_RECOGNITION);
+        if (afCode != ErrorInfo.MOK) {
+            Toast.makeText(this, getString(R.string.init_failed, afCode), Toast.LENGTH_SHORT).show();
+        }
+
+        flEngine = new FaceEngine();
+        afCode = flEngine.init(this, FaceEngine.ASF_DETECT_MODE_IMAGE, ConfigUtil.getFtOrient(this),
+                16, 1,  FaceEngine.ASF_LIVENESS);
+        if (afCode != ErrorInfo.MOK) {
+            Toast.makeText(this, getString(R.string.init_failed, afCode), Toast.LENGTH_SHORT).show();
+        }
+
+
+
     }
 
     /**
      * 销毁引擎
      */
     private void unInitEngine() {
-
-        if (afCode == ErrorInfo.MOK) {
-            afCode = faceEngine.unInit();
-            Log.i(TAG, "unInitEngine: " + afCode);
+        if (ftEngine != null){
+            ftEngine.unInit();
         }
+        if (flEngine != null){
+            flEngine.unInit();
+        }
+        if (frEngine != null){
+            frEngine.unInit();
+        }
+
     }
 
 
@@ -231,6 +252,13 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
             allGranted &= ContextCompat.checkSelfPermission(this, neededPermission) == PackageManager.PERMISSION_GRANTED;
         }
         return allGranted;
+    }
+    private int increaseCount(ConcurrentHashMap<Integer, Integer> countMap, Integer
+            requestId) {
+        Integer count = countMap.get(requestId);
+        int currentCount = count == null ? 1 : (count + 1);
+        countMap.put(requestId, currentCount);
+        return currentCount;
     }
 
     private void initCamera() {
@@ -280,6 +308,21 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
                 }
             }
 
+            @Override
+            public void onFaceLivenessInfoGet(@Nullable LivenessInfo livenessInfo, Integer requestId) {
+                if (livenessInfo != null) {
+                    if (livenessInfo.getLiveness() == LivenessInfo.NOT_ALIVE && increaseCount(livenessRetryCountMap, requestId) <= LIVENESS_RETRY_COUNT) {
+                        livenessMap.put(requestId, LivenessInfo.UNKNOWN);
+                    } else if (livenessInfo.getLiveness() == LivenessInfo.ALIVE || livenessInfo.getLiveness() == LivenessInfo.NOT_ALIVE) {
+                        livenessMap.put(requestId, livenessInfo.getLiveness());
+                    } else {
+                        livenessRetryCountMap.put(requestId, 0);
+                    }
+                } else {
+                    livenessMap.put(requestId, LivenessInfo.UNKNOWN);
+                }
+            }
+
         };
 
 
@@ -291,7 +334,9 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
                         , cameraId, isMirror, false, false);
 
                 faceHelper = new FaceHelper.Builder()
-                        .faceEngine(faceEngine)
+                        .ftEngine(ftEngine)
+                        .frEngine(frEngine)
+                        .flEngine(flEngine)
                         .frThreadNum(MAX_DETECT_NUM)
                         .previewSize(previewSize)
                         .faceListener(faceListener)
@@ -357,7 +402,12 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
 
                     for (int i = 0; i < facePreviewInfoList.size(); i++) {
                         if (livenessDetect) {
-                            livenessMap.put(facePreviewInfoList.get(i).getTrackId(), facePreviewInfoList.get(i).getLivenessInfo().getLiveness());
+                            Integer liveness = livenessMap.get(facePreviewInfoList.get(i).getTrackId());
+                            if (liveness == null
+                                    || (liveness != LivenessInfo.NOT_ALIVE && liveness != LivenessInfo.ALIVE && liveness != RequestLivenessStatus.ANALYZING)) {
+                                livenessMap.put(facePreviewInfoList.get(i).getTrackId(), RequestLivenessStatus.ANALYZING);
+                                faceHelper.requestFaceLiveness(nv21, facePreviewInfoList.get(i).getFaceInfo(), previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, facePreviewInfoList.get(i).getTrackId());
+                            }
                         }
                         /**
                          * 对于每个人脸，若状态为空或者为失败，则请求FR（可根据需要添加其他判断以限制FR次数），
@@ -446,6 +496,7 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
         }
         if (facePreviewInfoList == null || facePreviewInfoList.size() == 0) {
             requestFeatureStatusMap.clear();
+            livenessRetryCountMap.clear();
             livenessMap.clear();
             return;
         }
@@ -461,6 +512,7 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
             if (!contained) {
                 requestFeatureStatusMap.remove(integer);
                 livenessMap.remove(integer);
+                livenessRetryCountMap.remove(integer);
             }
         }
 

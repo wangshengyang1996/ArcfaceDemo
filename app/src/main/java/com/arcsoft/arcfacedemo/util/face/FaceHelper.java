@@ -2,7 +2,6 @@ package com.arcsoft.arcfacedemo.util.face;
 
 import android.graphics.Rect;
 import android.hardware.Camera;
-import android.support.annotation.NonNull;
 import android.util.Log;
 
 import com.arcsoft.arcfacedemo.model.FacePreviewInfo;
@@ -14,26 +13,28 @@ import com.arcsoft.face.FaceInfo;
 import com.arcsoft.face.LivenessInfo;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class FaceHelper {
     private static final String TAG = "FaceHelper";
-    private FaceEngine faceEngine;
+    private FaceEngine ftEngine;
+    private FaceEngine frEngine;
+    private FaceEngine flEngine;
 
     private Camera.Size previewSize;
 
     private List<FaceInfo> faceInfoList = new ArrayList<>();
-    private List<LivenessInfo> livenessInfoList = new ArrayList<>();
-    private ExecutorService executor;
+    private ExecutorService frExecutor;
+    private ExecutorService flExecutor;
     private LinkedBlockingQueue<Runnable> frThreadQueue = null;
+    private LinkedBlockingQueue<Runnable> flThreadQueue = null;
     private FaceListener faceListener;
     //trackId相关
     private int currentTrackId = 0;
@@ -45,10 +46,12 @@ public class FaceHelper {
     private static final float SIMILARITY_RECT = 0.3f;
 
     private FaceHelper(Builder builder) {
-        faceEngine = builder.faceEngine;
+        ftEngine = builder.ftEngine;
         faceListener = builder.faceListener;
         currentTrackId = builder.currentTrackId;
         previewSize = builder.previewSize;
+        frEngine = builder.frEngine;
+        flEngine = builder.flEngine;
         /*
       fr 线程数，建议和ft初始化时的maxFaceNum相同
      */
@@ -58,12 +61,23 @@ public class FaceHelper {
         } else {
             Log.e(TAG, "frThread num must > 0,now using default value:" + frThreadNum);
         }
+        int flThreadNum = 5;
+        if (builder.flThreadNum > 0) {
+            flThreadNum = builder.flThreadNum;
+        } else {
+            Log.e(TAG, "flThread num must > 0,now using default value:" + flThreadNum);
+        }
         frThreadQueue = new LinkedBlockingQueue<Runnable>(frThreadNum);
-        executor = new ThreadPoolExecutor(1, frThreadNum, 0, TimeUnit.MILLISECONDS, frThreadQueue);
+        frExecutor = new ThreadPoolExecutor(1, frThreadNum, 0, TimeUnit.MILLISECONDS, frThreadQueue);
+        flThreadQueue = new LinkedBlockingQueue<Runnable>(flThreadNum);
+        flExecutor = new ThreadPoolExecutor(1, frThreadNum, 0, TimeUnit.MILLISECONDS, flThreadQueue);
         if (previewSize == null) {
             throw new RuntimeException("previewSize must be specified!");
         }
     }
+
+
+
 
     /**
      * 请求获取人脸特征数据，需要传入FR的参数，以下参数同
@@ -77,8 +91,27 @@ public class FaceHelper {
      */
     public void requestFaceFeature(byte[] nv21, FaceInfo faceInfo, int width, int height, int format, Integer trackId) {
         if (faceListener != null) {
-            if (faceEngine != null && frThreadQueue.remainingCapacity() > 0) {
-                executor.execute(new FaceRecognizeRunnable(nv21, faceInfo, width, height, format, trackId));
+            if (frEngine != null && frThreadQueue.remainingCapacity() > 0) {
+                frExecutor.execute(new FaceRecognizeRunnable(nv21, faceInfo, width, height, format, trackId));
+            } else {
+                faceListener.onFaceFeatureInfoGet(null, trackId);
+            }
+        }
+    }
+    /**
+     * 请求获取活体检测结果，需要传入活体的参数，以下参数同
+     *
+     * @param nv21     NV21格式的图像数据
+     * @param faceInfo 人脸信息
+     * @param width    图像宽度
+     * @param height   图像高度
+     * @param format   图像格式
+     * @param trackId  请求人脸特征的唯一请求码，一般使用trackId
+     */
+    public void requestFaceLiveness(byte[] nv21, FaceInfo faceInfo, int width, int height, int format, Integer trackId) {
+        if (faceListener != null) {
+            if (flEngine != null && flThreadQueue.remainingCapacity() > 0) {
+                flExecutor.execute(new FaceLivenessDetectRunnable(nv21, faceInfo, width, height, format, trackId));
             } else {
                 faceListener.onFaceFeatureInfoGet(null, trackId);
             }
@@ -87,9 +120,13 @@ public class FaceHelper {
 
 
     public void release() {
-        if (!executor.isShutdown()) {
-            executor.shutdownNow();
+        if (!frExecutor.isShutdown()) {
+            frExecutor.shutdownNow();
             frThreadQueue.clear();
+        }
+        if (!flExecutor.isShutdown()) {
+            flExecutor.shutdownNow();
+            flThreadQueue.clear();
         }
         if (faceInfoList != null) {
             faceInfoList.clear();
@@ -106,10 +143,10 @@ public class FaceHelper {
 
     public List<FacePreviewInfo> onPreviewFrame(byte[] nv21) {
         if (faceListener != null) {
-            if (faceEngine != null) {
+            if (ftEngine != null) {
                 faceInfoList.clear();
                 long ftStartTime = System.currentTimeMillis();
-                int code = faceEngine.detectFaces(nv21, previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, faceInfoList);
+                int code = ftEngine.detectFaces(nv21, previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, faceInfoList);
                 if (code != ErrorInfo.MOK) {
                     faceListener.onFail(new Exception("ft failed,code is " + code));
                 } else {
@@ -122,20 +159,14 @@ public class FaceHelper {
 //                TrackUtil.keepMaxFace(faceInfoList);
 
                 refreshTrackId(faceInfoList);
-                code = faceEngine.process(nv21, previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, faceInfoList, FaceEngine.ASF_LIVENESS);
+                code = ftEngine.process(nv21, previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, faceInfoList, FaceEngine.ASF_LIVENESS);
                 if (code != ErrorInfo.MOK) {
                     faceListener.onFail(new Exception("process failed,code is " + code));
                 }
-                code = faceEngine.getLiveness(livenessInfoList);
-                if (code != ErrorInfo.MOK) {
-                    faceListener.onFail(new Exception("getLiveness failed,code is " + code));
-                }
             }
             facePreviewInfoList.clear();
-            if (livenessInfoList.size() == faceInfoList.size()) {
-                for (int i = 0; i < faceInfoList.size(); i++) {
-                    facePreviewInfoList.add(new FacePreviewInfo(faceInfoList.get(i), livenessInfoList.get(i), currentTrackIdList.get(i)));
-                }
+            for (int i = 0; i < faceInfoList.size(); i++) {
+                facePreviewInfoList.add(new FacePreviewInfo(faceInfoList.get(i), currentTrackIdList.get(i)));
             }
             return facePreviewInfoList;
         } else {
@@ -170,12 +201,12 @@ public class FaceHelper {
         @Override
         public void run() {
             if (faceListener != null && nv21Data != null) {
-                if (faceEngine != null) {
+                if (frEngine != null) {
                     FaceFeature faceFeature = new FaceFeature();
                     long frStartTime = System.currentTimeMillis();
                     int frCode;
                     synchronized (FaceHelper.this) {
-                        frCode = faceEngine.extractFaceFeature(nv21Data, width, height, format, faceInfo, faceFeature);
+                        frCode = frEngine.extractFaceFeature(nv21Data, width, height, format, faceInfo, faceFeature);
                     }
                     if (frCode == ErrorInfo.MOK) {
 //                        Log.i(TAG, "run: fr costTime = " + (System.currentTimeMillis() - frStartTime) + "ms");
@@ -193,7 +224,55 @@ public class FaceHelper {
         }
     }
 
+    /**
+     * 活体检测的线程
+     */
+    public class FaceLivenessDetectRunnable implements Runnable {
+        private FaceInfo faceInfo;
+        private int width;
+        private int height;
+        private int format;
+        private Integer trackId;
+        private byte[] nv21Data;
 
+        private FaceLivenessDetectRunnable(byte[] nv21Data, FaceInfo faceInfo, int width, int height, int format, Integer trackId) {
+            if (nv21Data == null) {
+                return;
+            }
+            this.nv21Data = nv21Data;
+            this.faceInfo = new FaceInfo(faceInfo);
+            this.width = width;
+            this.height = height;
+            this.format = format;
+            this.trackId = trackId;
+        }
+
+        @Override
+        public void run() {
+            if (faceListener != null && nv21Data != null) {
+                if (flEngine != null) {
+                    List<LivenessInfo> livenessInfoList = new ArrayList<>();
+                    int flCode;
+                    
+                    flCode = flEngine.process(nv21Data, width, height, format, Arrays.asList(faceInfo), FaceEngine.ASF_LIVENESS);
+                    if (flCode == ErrorInfo.MOK) {
+                        flCode = flEngine.getLiveness(livenessInfoList);
+                    }
+
+                    if (flCode == ErrorInfo.MOK && livenessInfoList.size() > 0) {
+                        faceListener.onFaceLivenessInfoGet( livenessInfoList.get(0), trackId);
+                    } else {
+                        faceListener.onFaceLivenessInfoGet( null, trackId);
+                        faceListener.onFail(new Exception("fl failed errorCode is " + flCode));
+                    }
+                } else {
+                    faceListener.onFaceLivenessInfoGet(null, trackId);
+                    faceListener.onFail(new Exception("fl failed ,frEngine is null"));
+                }
+            }
+            nv21Data = null;
+        }
+    }
     /**
      * 刷新trackId
      *
@@ -281,18 +360,34 @@ public class FaceHelper {
     }
 
     public static final class Builder {
-        private FaceEngine faceEngine;
+        private FaceEngine ftEngine;
+        private FaceEngine frEngine;
+        private FaceEngine flEngine;
         private Camera.Size previewSize;
         private FaceListener faceListener;
         private int frThreadNum;
         private int currentTrackId;
+        private int flThreadNum;
 
         public Builder() {
         }
 
 
-        public Builder faceEngine(FaceEngine val) {
-            faceEngine = val;
+        public Builder flThreadNum(int val) {
+            flThreadNum = val;
+            return this;
+        }
+
+        public Builder ftEngine(FaceEngine val) {
+            ftEngine = val;
+            return this;
+        }
+        public Builder frEngine(FaceEngine val) {
+            frEngine = val;
+            return this;
+        }
+        public Builder flEngine(FaceEngine val) {
+            flEngine = val;
             return this;
         }
 

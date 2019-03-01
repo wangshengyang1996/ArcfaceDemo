@@ -24,4 +24,12 @@ public interface FaceListener {
      * @param requestId 请求码
      */
     void  onFaceFeatureInfoGet(@Nullable FaceFeature faceFeature, Integer requestId);
+
+    /**
+     * 请求活体检测后的回调
+     *
+     * @param livenessInfo   活体结果
+     * @param requestId 请求码
+     */
+    void  onFaceLivenessInfoGet(@Nullable LivenessInfo livenessInfo, Integer requestId);
 }

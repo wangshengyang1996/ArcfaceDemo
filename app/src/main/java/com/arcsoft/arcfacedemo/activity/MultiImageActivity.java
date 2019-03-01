@@ -184,7 +184,9 @@ public class MultiImageActivity extends AppCompatActivity {
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
         //bitmap转NV21
+        long start = System.currentTimeMillis();
         final byte[] nv21 = ImageUtil.bitmapToNv21(bitmap, width, height);
+        Log.i(TAG, "processImage: cost = " + (System.currentTimeMillis() - start));
 
         if (nv21 != null) {
 
