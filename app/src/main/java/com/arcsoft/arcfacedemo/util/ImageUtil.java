@@ -6,6 +6,7 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.provider.MediaStore;
+import android.util.Log;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -63,6 +64,7 @@ public class ImageUtil {
         return nv21;
     }
 
+    private static final String TAG = "ImageUtil";
     /**
      * bitmap转化为bgr数据，格式为{@link Bitmap.Config#ARGB_8888}
      *
@@ -74,12 +76,12 @@ public class ImageUtil {
             return null;
         }
         int bytes = image.getByteCount();
-
         ByteBuffer buffer = ByteBuffer.allocate(bytes);
         image.copyPixelsToBuffer(buffer);
         byte[] temp = buffer.array();
         byte[] pixels = new byte[(temp.length / 4) * 3];
-        for (int i = 0; i < temp.length / 4; i++) {
+        int groupSize = temp.length / 4;
+        for (int i = 0; i < groupSize; i++) {
             pixels[i * 3] = temp[i * 4 + 2];
             pixels[i * 3 + 1] = temp[i * 4 + 1];
             pixels[i * 3 + 2] = temp[i * 4];

@@ -41,6 +41,7 @@ public class FaceHelper {
     private List<Integer> formerTrackIdList = new ArrayList<>();
     private List<Integer> currentTrackIdList = new ArrayList<>();
     private List<Rect> formerFaceRectList = new ArrayList<>();
+
     private List<FacePreviewInfo> facePreviewInfoList = new ArrayList<>();
     private ConcurrentHashMap<Integer, String> nameMap = new ConcurrentHashMap<>();
     private static final float SIMILARITY_RECT = 0.3f;
@@ -77,8 +78,6 @@ public class FaceHelper {
     }
 
 
-
-
     /**
      * 请求获取人脸特征数据，需要传入FR的参数，以下参数同
      *
@@ -98,6 +97,7 @@ public class FaceHelper {
             }
         }
     }
+
     /**
      * 请求获取活体检测结果，需要传入活体的参数，以下参数同
      *
@@ -203,15 +203,18 @@ public class FaceHelper {
             if (faceListener != null && nv21Data != null) {
                 if (frEngine != null) {
                     FaceFeature faceFeature = new FaceFeature();
-                    long frStartTime = System.currentTimeMillis();
                     int frCode;
                     synchronized (FaceHelper.this) {
                         frCode = frEngine.extractFaceFeature(nv21Data, width, height, format, faceInfo, faceFeature);
                     }
                     if (frCode == ErrorInfo.MOK) {
-//                        Log.i(TAG, "run: fr costTime = " + (System.currentTimeMillis() - frStartTime) + "ms");
-                        faceListener.onFaceFeatureInfoGet(faceFeature, trackId);
+                      faceListener.onFaceFeatureInfoGet(faceFeature, trackId);
                     } else {
+                        try {
+                            Thread.sleep(1);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                         faceListener.onFaceFeatureInfoGet(null, trackId);
                         faceListener.onFail(new Exception("fr failed errorCode is " + frCode));
                     }
@@ -253,16 +256,15 @@ public class FaceHelper {
                 if (flEngine != null) {
                     List<LivenessInfo> livenessInfoList = new ArrayList<>();
                     int flCode;
-                    
                     flCode = flEngine.process(nv21Data, width, height, format, Arrays.asList(faceInfo), FaceEngine.ASF_LIVENESS);
                     if (flCode == ErrorInfo.MOK) {
                         flCode = flEngine.getLiveness(livenessInfoList);
                     }
 
                     if (flCode == ErrorInfo.MOK && livenessInfoList.size() > 0) {
-                        faceListener.onFaceLivenessInfoGet( livenessInfoList.get(0), trackId);
+                        faceListener.onFaceLivenessInfoGet(livenessInfoList.get(0), trackId);
                     } else {
-                        faceListener.onFaceLivenessInfoGet( null, trackId);
+                        faceListener.onFaceLivenessInfoGet(null, trackId);
                         faceListener.onFail(new Exception("fl failed errorCode is " + flCode));
                     }
                 } else {
@@ -273,6 +275,7 @@ public class FaceHelper {
             nv21Data = null;
         }
     }
+
     /**
      * 刷新trackId
      *
@@ -293,22 +296,29 @@ public class FaceHelper {
             //前后都有人脸,对于每一个人脸框
             for (int i = 0; i < ftFaceList.size(); i++) {
                 //遍历上一次人脸框
+                int minDistance = Integer.MAX_VALUE;
+                int minDistanceIndex = -1;
                 for (int j = 0; j < formerFaceRectList.size(); j++) {
-                    //若是同一张人脸
-                    if (TrackUtil.isSameFace(SIMILARITY_RECT, formerFaceRectList.get(j), ftFaceList.get(i).getRect())) {
-                        //记录ID
-                        currentTrackIdList.set(i, formerTrackIdList.get(j));
-                        break;
+                    //获取最近的人脸框距离
+                    int distance = TrackUtil.getDistance(formerFaceRectList.get(j), ftFaceList.get(i).getRect());
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        minDistanceIndex = j;
                     }
+                }
+                //若这两个Rect距离小于两者最大人脸框宽度的1/4，认为是同一个人脸
+                if (minDistanceIndex != -1 && minDistance < (Math.max(ftFaceList.get(i).getRect().width(), formerFaceRectList.get(minDistanceIndex).width()) >> 2)) {
+                    currentTrackIdList.set(i, formerTrackIdList.get(minDistanceIndex));
                 }
             }
         }
-        //上一次人脸框不存在此人脸，新增
+        //上一次人脸框列表不存在的人脸就是新进入的人脸，其trackId为currentTrackId递增值
         for (int i = 0; i < currentTrackIdList.size(); i++) {
             if (currentTrackIdList.get(i) == -1) {
                 currentTrackIdList.set(i, ++currentTrackId);
             }
         }
+        //刷新前帧数据
         formerTrackIdList.clear();
         formerFaceRectList.clear();
         for (int i = 0; i < ftFaceList.size(); i++) {
@@ -382,10 +392,12 @@ public class FaceHelper {
             ftEngine = val;
             return this;
         }
+
         public Builder frEngine(FaceEngine val) {
             frEngine = val;
             return this;
         }
+
         public Builder flEngine(FaceEngine val) {
             flEngine = val;
             return this;

@@ -38,7 +38,7 @@ import com.arcsoft.arcfacedemo.util.DrawHelper;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PreviewActivity extends AppCompatActivity implements ViewTreeObserver.OnGlobalLayoutListener{
+public class PreviewActivity extends AppCompatActivity implements ViewTreeObserver.OnGlobalLayoutListener {
     private static final String TAG = "PreviewActivity";
     private CameraHelper cameraHelper;
     private DrawHelper drawHelper;
@@ -77,13 +77,10 @@ public class PreviewActivity extends AppCompatActivity implements ViewTreeObserv
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
 
 
-
         previewView = findViewById(R.id.texture_preview);
         previewView.getViewTreeObserver().addOnGlobalLayoutListener(this);
 
         faceRectView = findViewById(R.id.face_rect_view);
-
-
 
 
     }
@@ -139,8 +136,8 @@ public class PreviewActivity extends AppCompatActivity implements ViewTreeObserv
             public void onCameraOpened(Camera camera, int cameraId, int displayOrientation, boolean isMirror) {
                 Log.i(TAG, "onCameraOpened: " + cameraId + "  " + displayOrientation + " " + isMirror);
                 previewSize = camera.getParameters().getPreviewSize();
-                drawHelper = new DrawHelper(previewSize.width, previewSize.height, previewView.getWidth(), previewView.getHeight(), displayOrientation
-                        , cameraId, isMirror,false,false);
+                drawHelper = new DrawHelper(previewSize.width, previewSize.height, previewView.getMeasuredWidth(), previewView.getMeasuredHeight(), displayOrientation
+                        , cameraId, isMirror, false, false);
             }
 
 
@@ -157,27 +154,25 @@ public class PreviewActivity extends AppCompatActivity implements ViewTreeObserv
                     if (code != ErrorInfo.MOK) {
                         return;
                     }
-                }else {
+                } else {
                     return;
                 }
 
                 List<AgeInfo> ageInfoList = new ArrayList<>();
                 List<GenderInfo> genderInfoList = new ArrayList<>();
                 List<Face3DAngle> face3DAngleList = new ArrayList<>();
-                List<LivenessInfo> faceLivenessInfoList = new ArrayList<>();
                 int ageCode = faceEngine.getAge(ageInfoList);
                 int genderCode = faceEngine.getGender(genderInfoList);
                 int face3DAngleCode = faceEngine.getFace3DAngle(face3DAngleList);
-                int livenessCode = faceEngine.getLiveness(faceLivenessInfoList);
 
                 //有其中一个的错误码不为0，return
-                if ((ageCode | genderCode | face3DAngleCode | livenessCode) != ErrorInfo.MOK) {
+                if ((ageCode | genderCode | face3DAngleCode) != ErrorInfo.MOK) {
                     return;
                 }
                 if (faceRectView != null && drawHelper != null) {
                     List<DrawInfo> drawInfoList = new ArrayList<>();
                     for (int i = 0; i < faceInfoList.size(); i++) {
-                        drawInfoList.add(new DrawInfo(drawHelper.adjustRect(faceInfoList.get(i).getRect()), genderInfoList.get(i).getGender(), ageInfoList.get(i).getAge(), faceLivenessInfoList.get(i).getLiveness(), null));
+                        drawInfoList.add(new DrawInfo(drawHelper.adjustRect(faceInfoList.get(i).getRect()), genderInfoList.get(i).getGender(), ageInfoList.get(i).getAge(), LivenessInfo.UNKNOWN, null));
                     }
                     drawHelper.draw(faceRectView, drawInfoList);
                 }
@@ -247,6 +242,7 @@ public class PreviewActivity extends AppCompatActivity implements ViewTreeObserv
             initCamera();
         }
     }
+
     @Override
     protected void onResume() {
         super.onResume();

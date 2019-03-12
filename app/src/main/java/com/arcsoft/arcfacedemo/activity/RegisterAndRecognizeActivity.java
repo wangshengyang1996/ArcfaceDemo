@@ -177,25 +177,24 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
     private void initEngine() {
         ftEngine = new FaceEngine();
         afCode = ftEngine.init(this, FaceEngine.ASF_DETECT_MODE_VIDEO, ConfigUtil.getFtOrient(this),
-                16, MAX_DETECT_NUM,  FaceEngine.ASF_FACE_DETECT);
+                16, MAX_DETECT_NUM, FaceEngine.ASF_FACE_DETECT);
         if (afCode != ErrorInfo.MOK) {
             Toast.makeText(this, getString(R.string.init_failed, afCode), Toast.LENGTH_SHORT).show();
         }
 
         frEngine = new FaceEngine();
         afCode = frEngine.init(this, FaceEngine.ASF_DETECT_MODE_IMAGE, ConfigUtil.getFtOrient(this),
-                16, 1,  FaceEngine.ASF_FACE_RECOGNITION);
+                16, 1, FaceEngine.ASF_FACE_RECOGNITION);
         if (afCode != ErrorInfo.MOK) {
             Toast.makeText(this, getString(R.string.init_failed, afCode), Toast.LENGTH_SHORT).show();
         }
 
         flEngine = new FaceEngine();
         afCode = flEngine.init(this, FaceEngine.ASF_DETECT_MODE_IMAGE, ConfigUtil.getFtOrient(this),
-                16, 1,  FaceEngine.ASF_LIVENESS);
+                16, 1, FaceEngine.ASF_LIVENESS);
         if (afCode != ErrorInfo.MOK) {
             Toast.makeText(this, getString(R.string.init_failed, afCode), Toast.LENGTH_SHORT).show();
         }
-
 
 
     }
@@ -204,13 +203,13 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
      * 销毁引擎
      */
     private void unInitEngine() {
-        if (ftEngine != null){
+        if (ftEngine != null) {
             ftEngine.unInit();
         }
-        if (flEngine != null){
+        if (flEngine != null) {
             flEngine.unInit();
         }
-        if (frEngine != null){
+        if (frEngine != null) {
             frEngine.unInit();
         }
 
@@ -253,6 +252,7 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
         }
         return allGranted;
     }
+
     private int increaseCount(ConcurrentHashMap<Integer, Integer> countMap, Integer
             requestId) {
         Integer count = countMap.get(requestId);
