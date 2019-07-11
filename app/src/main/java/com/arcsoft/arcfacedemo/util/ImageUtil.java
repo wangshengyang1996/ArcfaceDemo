@@ -46,16 +46,16 @@ public class ImageUtil {
         byte[] nv21 = new byte[width * height * 3 / 2];
         for (int j = 0; j < height; ++j) {
             for (int i = 0; i < width; ++i) {
-                int R = (argb[index] & 0xFF0000) >> 16;
-                int G = (argb[index] & 0x00FF00) >> 8;
-                int B = argb[index] & 0x0000FF;
-                int Y = (66 * R + 129 * G + 25 * B + 128 >> 8) + 16;
-                int U = (-38 * R - 74 * G + 112 * B + 128 >> 8) + 128;
-                int V = (112 * R - 94 * G - 18 * B + 128 >> 8) + 128;
-                nv21[yIndex++] = (byte) (Y < 0 ? 0 : (Y > 255 ? 255 : Y));
+                int r = (argb[index] & 0xFF0000) >> 16;
+                int g = (argb[index] & 0x00FF00) >> 8;
+                int b = argb[index] & 0x0000FF;
+                int y = (66 * r + 129 * g + 25 * b + 128 >> 8) + 16;
+                int u = (-38 * r - 74 * g + 112 * b + 128 >> 8) + 128;
+                int v = (112 * r - 94 * g - 18 * b + 128 >> 8) + 128;
+                nv21[yIndex++] = (byte) (y < 0 ? 0 : (y > 255 ? 255 : y));
                 if (j % 2 == 0 && index % 2 == 0 && uvIndex < nv21.length - 2) {
-                    nv21[uvIndex++] = (byte) (V < 0 ? 0 : (V > 255 ? 255 : V));
-                    nv21[uvIndex++] = (byte) (U < 0 ? 0 : (U > 255 ? 255 : U));
+                    nv21[uvIndex++] = (byte) (v < 0 ? 0 : (v > 255 ? 255 : v));
+                    nv21[uvIndex++] = (byte) (u < 0 ? 0 : (u > 255 ? 255 : u));
                 }
 
                 ++index;

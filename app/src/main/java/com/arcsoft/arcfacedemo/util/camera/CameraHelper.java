@@ -342,7 +342,7 @@ public class CameraHelper implements Camera.PreviewCallback {
         public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
 
             stop();
-            return false;
+            return true;
         }
 
         @Override

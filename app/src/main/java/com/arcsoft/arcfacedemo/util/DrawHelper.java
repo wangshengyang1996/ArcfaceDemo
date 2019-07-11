@@ -1,6 +1,7 @@
 package com.arcsoft.arcfacedemo.util;
 
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
@@ -68,7 +69,6 @@ public class DrawHelper {
      * @return 调整后的需要被绘制到View上的rect
      */
     public Rect adjustRect(Rect ftRect) {
-
         int previewWidth = this.previewWidth;
         int previewHeight = this.previewHeight;
         int canvasWidth = this.canvasWidth;
@@ -187,7 +187,11 @@ public class DrawHelper {
         Paint paint = new Paint();
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(faceRectThickness);
-        paint.setColor(color);
+        if (drawInfo.getLiveness() == LivenessInfo.NOT_ALIVE){
+            paint.setColor(Color.RED);
+        }else {
+            paint.setColor(color);
+        }
         Path mPath = new Path();
         //左上
         Rect rect = drawInfo.getRect();

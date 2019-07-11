@@ -21,7 +21,7 @@ import android.widget.Toast;
 import com.arcsoft.arcfacedemo.R;
 import com.arcsoft.arcfacedemo.widget.ProgressDialog;
 import com.arcsoft.arcfacedemo.faceserver.FaceServer;
-import com.arcsoft.arcfacedemo.util.ImageUtil;
+import com.arcsoft.face.util.ImageUtils;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -36,7 +36,7 @@ public class FaceManageActivity extends AppCompatActivity {
     private static final String ROOT_DIR = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "arcfacedemo";
     private static final String REGISTER_DIR = ROOT_DIR + File.separator + "register";
     private static final String REGISTER_FAILED_DIR = ROOT_DIR + File.separator + "failed";
-    private ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private ExecutorService executorService ;
 
     private TextView tvNotificationRegisterResult;
 
@@ -52,6 +52,7 @@ public class FaceManageActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_face_manage);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        executorService = Executors.newSingleThreadExecutor();
         tvNotificationRegisterResult = findViewById(R.id.notification_register_result);
         progressDialog = new ProgressDialog(this);
         FaceServer.getInstance().init(this);
@@ -129,7 +130,7 @@ public class FaceManageActivity extends AppCompatActivity {
                         jpgFile.renameTo(failedFile);
                         continue;
                     }
-                    bitmap = ImageUtil.alignBitmapForNv21(bitmap);
+                    bitmap = ImageUtils.alignBitmapForBgr24(bitmap);
                     if (bitmap == null) {
                         File failedFile = new File(REGISTER_FAILED_DIR + File.separator + jpgFile.getName());
                         if (!failedFile.getParentFile().exists()) {
@@ -138,8 +139,8 @@ public class FaceManageActivity extends AppCompatActivity {
                         jpgFile.renameTo(failedFile);
                         continue;
                     }
-                    byte[] nv21 = ImageUtil.bitmapToNv21(bitmap, bitmap.getWidth(), bitmap.getHeight());
-                    boolean success = FaceServer.getInstance().register(FaceManageActivity.this, nv21, bitmap.getWidth(), bitmap.getHeight(),
+                    byte[] bgr24 = ImageUtils.bitmapToBgr24(bitmap);
+                    boolean success = FaceServer.getInstance().registerBgr24(FaceManageActivity.this, bgr24, bitmap.getWidth(), bitmap.getHeight(),
                             jpgFile.getName().substring(0, jpgFile.getName().lastIndexOf(".")));
                     if (!success) {
                         File failedFile = new File(REGISTER_FAILED_DIR + File.separator + jpgFile.getName());

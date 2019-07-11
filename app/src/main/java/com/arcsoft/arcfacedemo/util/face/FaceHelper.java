@@ -40,7 +40,7 @@ public class FaceHelper {
     private int currentTrackId = 0;
     private List<Integer> formerTrackIdList = new ArrayList<>();
     private List<Integer> currentTrackIdList = new ArrayList<>();
-    private List<Rect> formerFaceRectList = new ArrayList<>();
+    private List<FaceInfo> formerFaceRectList = new ArrayList<>();
 
     private List<FacePreviewInfo> facePreviewInfoList = new ArrayList<>();
     private ConcurrentHashMap<Integer, String> nameMap = new ConcurrentHashMap<>();
@@ -152,17 +152,8 @@ public class FaceHelper {
                 } else {
 //                    Log.i(TAG, "onPreviewFrame: ft costTime = " + (System.currentTimeMillis() - ftStartTime) + "ms");
                 }
-                /*
-                 * 活体检测只支持一个人脸，所以只保留最大的人脸
-                 * 若需要多人脸搜索，删除此行代码，并且关闭活体判断
-                 */
-//                TrackUtil.keepMaxFace(faceInfoList);
 
                 refreshTrackId(faceInfoList);
-                code = ftEngine.process(nv21, previewSize.width, previewSize.height, FaceEngine.CP_PAF_NV21, faceInfoList, FaceEngine.ASF_LIVENESS);
-                if (code != ErrorInfo.MOK) {
-                    faceListener.onFail(new Exception("process failed,code is " + code));
-                }
             }
             facePreviewInfoList.clear();
             for (int i = 0; i < faceInfoList.size(); i++) {
@@ -296,19 +287,11 @@ public class FaceHelper {
             //前后都有人脸,对于每一个人脸框
             for (int i = 0; i < ftFaceList.size(); i++) {
                 //遍历上一次人脸框
-                int minDistance = Integer.MAX_VALUE;
-                int minDistanceIndex = -1;
                 for (int j = 0; j < formerFaceRectList.size(); j++) {
-                    //获取最近的人脸框距离
-                    int distance = TrackUtil.getDistance(formerFaceRectList.get(j), ftFaceList.get(i).getRect());
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        minDistanceIndex = j;
+                    if (formerFaceRectList .get(j).getFaceId() == ftFaceList.get(i).getFaceId()){
+                        currentTrackIdList.set(i, formerTrackIdList.get(j));
+                        break;
                     }
-                }
-                //若这两个Rect距离小于两者最大人脸框宽度的1/4，认为是同一个人脸
-                if (minDistanceIndex != -1 && minDistance < (Math.max(ftFaceList.get(i).getRect().width(), formerFaceRectList.get(minDistanceIndex).width()) >> 2)) {
-                    currentTrackIdList.set(i, formerTrackIdList.get(minDistanceIndex));
                 }
             }
         }
@@ -322,7 +305,7 @@ public class FaceHelper {
         formerTrackIdList.clear();
         formerFaceRectList.clear();
         for (int i = 0; i < ftFaceList.size(); i++) {
-            formerFaceRectList.add(new Rect(ftFaceList.get(i).getRect()));
+            formerFaceRectList.add(ftFaceList.get(i));
             formerTrackIdList.add(currentTrackIdList.get(i));
         }
 

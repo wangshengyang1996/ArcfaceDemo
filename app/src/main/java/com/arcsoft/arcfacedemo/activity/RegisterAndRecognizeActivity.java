@@ -350,12 +350,15 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
                 if (faceRectView != null) {
                     faceRectView.clearFaceInfo();
                 }
-                List<FacePreviewInfo> facePreviewInfoList = faceHelper.onPreviewFrame(nv21);
+                final List<FacePreviewInfo> facePreviewInfoList = faceHelper.onPreviewFrame(nv21);
                 if (facePreviewInfoList != null && faceRectView != null && drawHelper != null) {
                     List<DrawInfo> drawInfoList = new ArrayList<>();
                     for (int i = 0; i < facePreviewInfoList.size(); i++) {
-                        String name = faceHelper.getName(facePreviewInfoList.get(i).getTrackId());
-                        drawInfoList.add(new DrawInfo(drawHelper.adjustRect(facePreviewInfoList.get(i).getFaceInfo().getRect()), GenderInfo.UNKNOWN, AgeInfo.UNKNOWN_AGE, LivenessInfo.UNKNOWN,
+                        int trackId = facePreviewInfoList.get(i).getTrackId();
+                        String name = faceHelper.getName(trackId);
+                        Integer liveness = livenessMap.get(trackId);
+                        drawInfoList.add(new DrawInfo(drawHelper.adjustRect(facePreviewInfoList.get(i).getFaceInfo().getRect()), GenderInfo.UNKNOWN, AgeInfo.UNKNOWN_AGE,
+                                liveness == null ? LivenessInfo.UNKNOWN : liveness,
                                 name == null ? String.valueOf(facePreviewInfoList.get(i).getTrackId()) : name));
                     }
                     drawHelper.draw(faceRectView, drawInfoList);
@@ -365,7 +368,7 @@ public class RegisterAndRecognizeActivity extends AppCompatActivity implements V
                     Observable.create(new ObservableOnSubscribe<Boolean>() {
                         @Override
                         public void subscribe(ObservableEmitter<Boolean> emitter) {
-                            boolean success = FaceServer.getInstance().register(RegisterAndRecognizeActivity.this, nv21.clone(), previewSize.width, previewSize.height, "registered " + faceHelper.getCurrentTrackId());
+                            boolean success = FaceServer.getInstance().registerNv21(RegisterAndRecognizeActivity.this, nv21.clone(), previewSize.width, previewSize.height, facePreviewInfoList.get(0).getFaceInfo(), "registered " + faceHelper.getCurrentTrackId());
                             emitter.onNext(success);
                         }
                     })

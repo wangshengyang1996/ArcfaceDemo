@@ -9,12 +9,13 @@ import android.graphics.YuvImage;
 import android.util.Log;
 
 import com.arcsoft.arcfacedemo.model.FaceRegisterInfo;
-import com.arcsoft.arcfacedemo.util.ImageUtil;
 import com.arcsoft.face.ErrorInfo;
 import com.arcsoft.face.FaceEngine;
 import com.arcsoft.face.FaceFeature;
 import com.arcsoft.face.FaceInfo;
 import com.arcsoft.face.FaceSimilar;
+import com.arcsoft.face.util.ImageUtils;
+
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -62,7 +63,7 @@ public class FaceServer {
         synchronized (this) {
             if (faceEngine == null && context != null) {
                 faceEngine = new FaceEngine();
-                int engineCode = faceEngine.init(context, FaceEngine.ASF_DETECT_MODE_IMAGE, FaceEngine.ASF_OP_0_HIGHER_EXT, 16, 1, FaceEngine.ASF_FACE_RECOGNITION | FaceEngine.ASF_FACE_DETECT);
+                int engineCode = faceEngine.init(context, FaceEngine.ASF_DETECT_MODE_IMAGE, FaceEngine.ASF_OP_0_ONLY, 16, 1, FaceEngine.ASF_FACE_RECOGNITION | FaceEngine.ASF_FACE_DETECT);
                 if (engineCode == ErrorInfo.MOK) {
                     initFaceList(context);
                     return true;
@@ -190,16 +191,17 @@ public class FaceServer {
     }
 
     /**
-     * 注册人脸
+     * 用于预览时注册人脸
      *
-     * @param context 上下文对象
-     * @param nv21    NV21数据
-     * @param width   NV21宽度
-     * @param height  NV21高度
-     * @param name    保存的名字，可为空
+     * @param context  上下文对象
+     * @param nv21     NV21数据
+     * @param width    NV21宽度
+     * @param height   NV21高度
+     * @param faceInfo {@link FaceEngine#detectFaces(byte[], int, int, int, List)}获取的人脸信息
+     * @param name     保存的名字，若为空则使用时间戳
      * @return 是否注册成功
      */
-    public boolean register(Context context, byte[] nv21, int width, int height, String name) {
+    public boolean registerNv21(Context context, byte[] nv21, int width, int height, FaceInfo faceInfo, String name) {
         synchronized (this) {
             if (faceEngine == null || context == null || nv21 == null || width % 4 != 0 || nv21.length != width * height * 3 / 2) {
                 return false;
@@ -225,27 +227,137 @@ public class FaceServer {
             if (!dirExists) {
                 return false;
             }
-            //1.人脸检测
+            FaceFeature faceFeature = new FaceFeature();
+            //特征提取
+            int code = faceEngine.extractFaceFeature(nv21, width, height, FaceEngine.CP_PAF_NV21, faceInfo, faceFeature);
+            String userName = name == null ? String.valueOf(System.currentTimeMillis()) : name;
+            try {
+                //保存注册结果（注册图、特征数据）
+                if (code == ErrorInfo.MOK) {
+                    YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, width, height, null);
+                    //为了美观，扩大rect截取注册图
+                    Rect cropRect = getBestRect(width, height, faceInfo.getRect());
+                    if (cropRect == null) {
+                        return false;
+                    }
+                    File file = new File(imgDir + File.separator + userName + IMG_SUFFIX);
+                    FileOutputStream fosImage = new FileOutputStream(file);
+                    yuvImage.compressToJpeg(cropRect, 100, fosImage);
+                    fosImage.close();
+                    Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+
+                    //判断人脸旋转角度，若不为0度则旋转注册图
+                    boolean needAdjust = false;
+                    if (bitmap != null) {
+                        switch (faceInfo.getOrient()) {
+                            case FaceEngine.ASF_OC_0:
+                                break;
+                            case FaceEngine.ASF_OC_90:
+                                bitmap = ImageUtils.rotateBitmap(bitmap, 90);
+                                needAdjust = true;
+                                break;
+                            case FaceEngine.ASF_OC_180:
+                                bitmap = ImageUtils.rotateBitmap(bitmap, 180);
+                                needAdjust = true;
+                                break;
+                            case FaceEngine.ASF_OC_270:
+                                bitmap = ImageUtils.rotateBitmap(bitmap, 270);
+                                needAdjust = true;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    if (needAdjust) {
+                        fosImage = new FileOutputStream(file);
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fosImage);
+                        fosImage.close();
+                    }
+
+                    FileOutputStream fosFeature = new FileOutputStream(featureDir + File.separator + userName);
+                    fosFeature.write(faceFeature.getFeatureData());
+                    fosFeature.close();
+
+                    //内存中的数据同步
+                    if (faceRegisterInfoList == null) {
+                        faceRegisterInfoList = new ArrayList<>();
+                    }
+                    faceRegisterInfoList.add(new FaceRegisterInfo(faceFeature.getFeatureData(), userName));
+                    return true;
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return false;
+        }
+
+    }
+
+    /**
+     * 用于注册照片人脸
+     *
+     * @param context  上下文对象
+     * @param bgr24    bgr24数据
+     * @param width    bgr24宽度
+     * @param height   bgr24高度
+     * @param name     保存的名字，若为空则使用时间戳
+     * @return 是否注册成功
+     */
+    public boolean registerBgr24(Context context, byte[] bgr24, int width, int height, String name) {
+        synchronized (this) {
+            if (faceEngine == null || context == null || bgr24 == null || width % 4 != 0 || bgr24.length != width * height * 3) {
+                return false;
+            }
+
+            if (ROOT_PATH == null) {
+                ROOT_PATH = context.getFilesDir().getAbsolutePath();
+            }
+            boolean dirExists = true;
+            //特征存储的文件夹
+            File featureDir = new File(ROOT_PATH + File.separator + SAVE_FEATURE_DIR);
+            if (!featureDir.exists()) {
+                dirExists = featureDir.mkdirs();
+            }
+            if (!dirExists) {
+                return false;
+            }
+            //图片存储的文件夹
+            File imgDir = new File(ROOT_PATH + File.separator + SAVE_IMG_DIR);
+            if (!imgDir.exists()) {
+                dirExists = imgDir.mkdirs();
+            }
+            if (!dirExists) {
+                return false;
+            }
+            //人脸检测
             List<FaceInfo> faceInfoList = new ArrayList<>();
-            int code = faceEngine.detectFaces(nv21, width, height, FaceEngine.CP_PAF_NV21, faceInfoList);
+            int code = faceEngine.detectFaces(bgr24, width, height, FaceEngine.CP_PAF_BGR24, faceInfoList);
             if (code == ErrorInfo.MOK && faceInfoList.size() > 0) {
                 FaceFeature faceFeature = new FaceFeature();
 
-                //2.特征提取
-                code = faceEngine.extractFaceFeature(nv21, width, height, FaceEngine.CP_PAF_NV21, faceInfoList.get(0), faceFeature);
+                //特征提取
+                code = faceEngine.extractFaceFeature(bgr24, width, height, FaceEngine.CP_PAF_BGR24, faceInfoList.get(0), faceFeature);
                 String userName = name == null ? String.valueOf(System.currentTimeMillis()) : name;
                 try {
-                    //3.保存注册结果（注册图、特征数据）
+                    //保存注册结果（注册图、特征数据）
                     if (code == ErrorInfo.MOK) {
-                        YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, width, height, null);
                         //为了美观，扩大rect截取注册图
                         Rect cropRect = getBestRect(width, height, faceInfoList.get(0).getRect());
                         if (cropRect == null) {
                             return false;
                         }
+                        if ((cropRect.width() & 1) == 1) {
+                            cropRect.right--;
+                        }
+                        if ((cropRect.height() & 1) == 1) {
+                            cropRect.bottom--;
+                        }
                         File file = new File(imgDir + File.separator + userName + IMG_SUFFIX);
                         FileOutputStream fosImage = new FileOutputStream(file);
-                        yuvImage.compressToJpeg(cropRect, 100, fosImage);
+                        byte[] headBgr24 = ImageUtils.cropBgr24(bgr24, width, height, cropRect);
+                        Bitmap headBmp = ImageUtils.bgrToBitmap(headBgr24, cropRect.width(), cropRect.height());
+                        headBmp.compress(Bitmap.CompressFormat.JPEG, 100, fosImage);
                         fosImage.close();
                         Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
 
@@ -256,15 +368,15 @@ public class FaceServer {
                                 case FaceEngine.ASF_OC_0:
                                     break;
                                 case FaceEngine.ASF_OC_90:
-                                    bitmap = ImageUtil.getRotateBitmap(bitmap, 90);
+                                    bitmap = ImageUtils.rotateBitmap(bitmap, 90);
                                     needAdjust = true;
                                     break;
                                 case FaceEngine.ASF_OC_180:
-                                    bitmap = ImageUtil.getRotateBitmap(bitmap, 180);
+                                    bitmap = ImageUtils.rotateBitmap(bitmap, 180);
                                     needAdjust = true;
                                     break;
                                 case FaceEngine.ASF_OC_270:
-                                    bitmap = ImageUtil.getRotateBitmap(bitmap, 270);
+                                    bitmap = ImageUtils.rotateBitmap(bitmap, 270);
                                     needAdjust = true;
                                     break;
                                 default:
@@ -372,7 +484,7 @@ public class FaceServer {
             rect.bottom -= maxOverFlow;
             return rect;
         }
-        //1.原rect边界未溢出宽高的情况
+        //2.原rect边界未溢出宽高的情况
         int padding = rect.height() / 2;
         //若以此padding扩张rect会溢出，取最大padding为四个边距的最小值
         if (!(rect.left - padding > 0 && rect.right + padding < width && rect.top - padding > 0 && rect.bottom + padding < height)) {
