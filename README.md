@@ -1,11 +1,6 @@
 # ArcfaceDemo
 基于虹软android ArcfaceDemo(arcface 2.0）的扩展
-
 相比于官网发布的arcface2.0 android demo:
-
-**FIX BUG:**
-
-1.修复在部分设备上画框偏移的问题
 
 **功能修改:**
 
@@ -17,10 +12,6 @@
 
 4.使用Image模式的活体检测，即 **支持多人脸活体检测+人脸识别**
 
-### 2019.07.12更新
-1.使用arcface 2.2 sdk</br>
-2.弃用以Rect作为trackId的方案，直接使用arcface2.2新增的faceId作为上下帧相同人脸的判断依据
-
 **效果展示：**
  ![正常预览](https://github.com/wangshengyang1996/ArcfaceDemo/blob/master/zxy1.jpg)
  ![圆角预览](https://github.com/wangshengyang1996/ArcfaceDemo/blob/master/zxy2.jpg)
@@ -28,3 +19,9 @@
 **ftRect转化为view所需的Rect流程**
 
  ![ftRect转化为view所需的Rect流程](https://github.com/wangshengyang1996/ArcfaceDemo/blob/master/rectChangeStep.jpg)
+
+
+---
+### 2019.07.12更新
+1.使用arcface 2.2 sdk</br>
+2.弃用以Rect作为trackId的方案，直接使用arcface2.2新增的faceId作为上下帧相同人脸的判断依据
