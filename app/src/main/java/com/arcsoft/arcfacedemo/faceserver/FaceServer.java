@@ -447,9 +447,7 @@ public class FaceServer {
      * @param srcRect 原Rect
      * @return 调整后的Rect
      */
-
     private static Rect getBestRect(int width, int height, Rect srcRect) {
-
         if (srcRect == null) {
             return null;
         }
